@@ -20,8 +20,11 @@ export class AntaresService {
   private config: AntaresConfig;
 
   constructor(config: AntaresConfig) {
+    // Use HTTPS URL without explicit port for better compatibility
+    const baseUrl =
+      config.baseUrl || "https://platform.antares.id/~/antares-cse/antares-id";
     this.config = {
-      baseUrl: 'https://platform.antares.id:8443/~/antares-cse/antares-id',
+      baseUrl: baseUrl.replace(":8443", ""), // Remove explicit port if present
       ...config,
     };
   }
@@ -29,12 +32,16 @@ export class AntaresService {
   /**
    * Decode hex data based on device type
    */
-  private decodeHexData(hexString: string, deviceCode: string): AntaresData | null {
+  private decodeHexData(
+    hexString: string,
+    deviceCode: string
+  ): AntaresData | null {
     try {
       // Remove any whitespace and ensure uppercase
-      const cleanHex = hexString.replace(/\s+/g, '').toUpperCase();
+      const cleanHex = hexString.replace(/\s+/g, "").toUpperCase();
 
-      if (deviceCode.startsWith('CZ')) {  // Cabai (4 sensors)
+      if (deviceCode.startsWith("CZ")) {
+        // Cabai (4 sensors)
         return {
           ph: parseInt(cleanHex.substr(0, 4), 16) / 100,
           moisture: parseInt(cleanHex.substr(4, 4), 16) / 10,
@@ -44,7 +51,8 @@ export class AntaresService {
         };
       }
 
-      if (deviceCode.startsWith('MZ') || deviceCode.startsWith('SZ')) {  // Melon/Selada (3 sensors)
+      if (deviceCode.startsWith("MZ") || deviceCode.startsWith("SZ")) {
+        // Melon/Selada (3 sensors)
         return {
           ph: parseInt(cleanHex.substr(0, 4), 16) / 100,
           ec: parseInt(cleanHex.substr(4, 4), 16) / 100,
@@ -53,7 +61,8 @@ export class AntaresService {
         };
       }
 
-      if (deviceCode.startsWith('GZ')) {  // Greenhouse (3 sensors)
+      if (deviceCode.startsWith("GZ")) {
+        // Greenhouse (3 sensors)
         return {
           temperature: parseInt(cleanHex.substr(0, 4), 16) / 10,
           humidity: parseInt(cleanHex.substr(4, 4), 16) / 10,
@@ -74,7 +83,7 @@ export class AntaresService {
 
       return null;
     } catch (error) {
-      console.error('Error decoding hex data:', error);
+      console.error("Error decoding hex data:", error);
       return null;
     }
   }
@@ -87,7 +96,7 @@ export class AntaresService {
       let parsedContent;
 
       // Handle string content
-      if (typeof content === 'string') {
+      if (typeof content === "string") {
         try {
           parsedContent = JSON.parse(content);
         } catch {
@@ -99,7 +108,7 @@ export class AntaresService {
       }
 
       // Check if data is in hex format
-      if (parsedContent.data && typeof parsedContent.data === 'string') {
+      if (parsedContent.data && typeof parsedContent.data === "string") {
         const hexData = parsedContent.data;
         // Try to decode as hex data
         const decodedData = this.decodeHexData(hexData, this.config.deviceId);
@@ -112,11 +121,13 @@ export class AntaresService {
       return {
         temperature: parseFloat(parsedContent.temperature) || 0,
         ph: parseFloat(parsedContent.ph) || 0,
-        tdsLevel: parseFloat(parsedContent.tdsLevel) || parseFloat(parsedContent.waterLevel) || 0,
+        tdsLevel:
+          parseFloat(parsedContent.tdsLevel) ||
+          parseFloat(parsedContent.waterLevel) ||
+          0,
       };
-
     } catch (error) {
-      console.error('Error parsing content:', error);
+      console.error("Error parsing content:", error);
       return null;
     }
   }
@@ -126,31 +137,32 @@ export class AntaresService {
       const response = await fetch(
         `${this.config.baseUrl}/${this.config.applicationId}/${this.config.deviceId}/la`,
         {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'X-M2M-Origin': this.config.apiKey,
-            'Content-Type': 'application/json;ty=4',
-            'Accept': 'application/json',
+            "X-M2M-Origin": this.config.apiKey,
+            "Content-Type": "application/json;ty=4",
+            Accept: "application/json",
           },
         }
       );
 
       if (!response.ok) {
-        throw new Error(`Antares API error: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Antares API error: ${response.status} ${response.statusText}`
+        );
       }
 
       const data = await response.json();
 
       // Parse the Antares response format
-      const content = data['m2m:cin']?.con;
+      const content = data["m2m:cin"]?.con;
       if (!content) {
-        throw new Error('Invalid response format from Antares API');
+        throw new Error("Invalid response format from Antares API");
       }
 
       return this.parseContent(content);
-
     } catch (error) {
-      console.error('Error fetching data from Antares:', error);
+      console.error("Error fetching data from Antares:", error);
       return null;
     }
   }
@@ -160,21 +172,23 @@ export class AntaresService {
       const response = await fetch(
         `${this.config.baseUrl}/${this.config.applicationId}/${this.config.deviceId}?rcn=4&lim=${limit}`,
         {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'X-M2M-Origin': this.config.apiKey,
-            'Content-Type': 'application/json;ty=4',
-            'Accept': 'application/json',
+            "X-M2M-Origin": this.config.apiKey,
+            "Content-Type": "application/json;ty=4",
+            Accept: "application/json",
           },
         }
       );
 
       if (!response.ok) {
-        throw new Error(`Antares API error: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Antares API error: ${response.status} ${response.statusText}`
+        );
       }
 
       const data = await response.json();
-      const contentInstances = data['m2m:cnt']?.['m2m:cin'] || [];
+      const contentInstances = data["m2m:cnt"]?.["m2m:cin"] || [];
 
       const historicalData: AntaresData[] = [];
 
@@ -188,9 +202,8 @@ export class AntaresService {
       }
 
       return historicalData.reverse(); // Reverse to get chronological order
-
     } catch (error) {
-      console.error('Error fetching historical data from Antares:', error);
+      console.error("Error fetching historical data from Antares:", error);
       return [];
     }
   }
@@ -204,9 +217,9 @@ export class AntaresService {
 }
 
 export const antaresService = new AntaresService({
-  apiKey: process.env.ANTARES_API_KEY || process.env.API_KEY || 'demo_key',
-  deviceId: process.env.ANTARES_DEVICE_ID || 'hydro_sensor',
-  applicationId: process.env.ANTARES_APPLICATION_ID || 'hydroponic_system',
+  apiKey: process.env.ANTARES_API_KEY || process.env.API_KEY || "demo_key",
+  deviceId: process.env.ANTARES_DEVICE_ID || "hydro_sensor",
+  applicationId: process.env.ANTARES_APPLICATION_ID || "hydroponic_system",
 });
 
 // Example usage:
