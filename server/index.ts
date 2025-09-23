@@ -7,6 +7,12 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Log all requests
+app.use((req, res, next) => {
+  console.log(new Date().toISOString(), `${req.method} ${req.url}`);
+  next();
+});
+
 // Add CORS headers
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
